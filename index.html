@@ -1,0 +1,343 @@
+<!DOCTYPE html>
+<html lang="vi">
+
+<head>
+    <meta charset="UTF-8" />
+    <title>AI Assistant Chat</title>
+    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: "Segoe UI", sans-serif;
+            background: linear-gradient(135deg, #74b9ff, #a29bfe);
+            margin: 0;
+            padding: 0;
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .container {
+            width: 95%;
+            height: 90vh;
+            background: #fff;
+            border-radius: 12px;
+            box-shadow: 0 5px 20px rgba(0, 0, 0, 0.2);
+            display: flex;
+            overflow: hidden;
+        }
+
+        /* Sidebar */
+        .sidebar {
+            width: 30%;
+            background: #f1f2f6;
+            display: flex;
+            flex-direction: column;
+            border-right: 1px solid #ddd;
+        }
+
+        .sidebar-header {
+            background: #0984e3;
+            color: #fff;
+            padding: 15px;
+            font-weight: bold;
+            text-align: center;
+        }
+
+        .new-btn {
+            background: #00b894;
+            color: #fff;
+            border: none;
+            margin: 10px;
+            padding: 10px;
+            border-radius: 8px;
+            font-size: 15px;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+
+        .new-btn:hover {
+            background: #009874;
+        }
+
+        .conversation-list {
+            flex: 1;
+            overflow-y: auto;
+            padding: 10px;
+        }
+
+        .conversation-item {
+            padding: 12px;
+            border-radius: 8px;
+            background: #fff;
+            margin-bottom: 8px;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+
+        .conversation-item:hover {
+            background: #dfe6e9;
+        }
+
+        .conversation-item.active {
+            background: #74b9ff;
+            color: white;
+            font-weight: bold;
+        }
+
+        /* Chat area */
+        .chat-area {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            background: #fafafa;
+        }
+
+        .chat-header {
+            background: #0984e3;
+            color: white;
+            padding: 15px;
+            font-size: 18px;
+            font-weight: bold;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        #figmaBtn {
+            background: #00cec9;
+            border: none;
+            color: white;
+            padding: 6px 12px;
+            border-radius: 6px;
+            font-size: 14px;
+            cursor: pointer;
+            display: none;
+        }
+
+        #figmaBtn:hover {
+            background: #00b2af;
+        }
+
+        .chat-box {
+            flex: 1;
+            overflow-y: auto;
+            padding: 20px;
+            list-style: none;
+            display: flex;
+            flex-direction: column;
+            background: #f9f9f9;
+        }
+
+        .chat-box li {
+            margin: 8px 0;
+            padding: 10px 15px;
+            border-radius: 10px;
+            max-width: 70%;
+            font-size: 16px;
+        }
+
+        .chat-box li.user {
+            background: #d1f8ff;
+            align-self: flex-end;
+            text-align: right;
+        }
+
+        .chat-box li.system {
+            background: #e6e6e6;
+            align-self: flex-start;
+        }
+
+        .chat-input {
+            display: flex;
+            border-top: 1px solid #ccc;
+        }
+
+        .chat-input input {
+            flex: 1;
+            padding: 15px;
+            border: none;
+            outline: none;
+            font-size: 16px;
+        }
+
+        .chat-input button {
+            background: #0984e3;
+            color: white;
+            border: none;
+            padding: 0 25px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: background 0.3s;
+        }
+
+        .chat-input button:hover {
+            background: #0767b4;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <!-- Sidebar -->
+        <div class="sidebar">
+            <div class="sidebar-header">💬 Conversations</div>
+            <button class="new-btn" onclick="createConversation()">➕ Tạo mới</button>
+            <div id="conversationList" class="conversation-list"></div>
+        </div>
+
+        <!-- Chat Area -->
+        <div class="chat-area">
+            <div id="chatHeader" class="chat-header">
+                <span id="chatTitle">Chọn một cuộc trò chuyện</span>
+                <button id="figmaBtn">🧩 Tạo layout Figma</button>
+            </div>
+
+            <ul id="chat" class="chat-box"></ul>
+            <div class="chat-input">
+                <input id="msg" type="text" placeholder="Nhập tin nhắn..." disabled />
+                <button onclick="sendMsg()">Gửi</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const socket = io("http://localhost:8080");
+        let conversationId = null;
+        let currentTitle = null;
+
+        socket.on("connect", () => {
+            console.log("✅ Socket connected:", socket.id);
+        });
+
+        // Thêm tin nhắn vào khung chat
+        function addMessage(text, sender = "system") {
+            const li = document.createElement("li");
+            li.textContent = text;
+            li.classList.add(sender);
+            const chatBox = document.getElementById("chat");
+            chatBox.appendChild(li);
+            chatBox.scrollTop = chatBox.scrollHeight;
+        }
+
+        // Tải danh sách conversation
+        function loadConversations() {
+            axios.get("http://localhost:8080/api/conversations")
+                .then(res => {
+                    const list = document.getElementById("conversationList");
+                    list.innerHTML = "";
+                    res.data.data.conversations.forEach(conv => {
+                        const div = document.createElement("div");
+                        div.classList.add("conversation-item");
+                        div.textContent = conv.title;
+                        div.onclick = (e) => selectConversation(conv, e);
+                        list.appendChild(div);
+                    });
+                })
+                .catch(err => {
+                    console.error("❌ Lỗi tải conversations:", err);
+                });
+        }
+
+        // Chọn conversation
+        function selectConversation(conv, e) {
+            conversationId = conv._id;
+            currentTitle = conv.title;
+
+            document.getElementById("chatTitle").textContent = conv.title;
+            document.getElementById("figmaBtn").style.display = "inline-block"; // hiển nút Figma
+
+            // highlight conversation đang chọn
+            document.querySelectorAll(".conversation-item").forEach(i => i.classList.remove("active"));
+            if (e && e.target) e.target.classList.add("active");
+
+            // reset chat
+            document.getElementById("chat").innerHTML = "";
+            document.getElementById("msg").disabled = false;
+
+            socket.emit("join_room", conversationId);
+
+            // load messages
+            axios.get(`http://localhost:8080/api/messages/${conversationId}`)
+                .then(res => {
+                    const messages = res.data.data.messages;
+                    messages.forEach(m => addMessage(m.text, m.sender));
+                })
+                .catch(err => {
+                    console.error("❌ Lỗi tải messages:", err);
+                });
+        }
+
+        // Tạo mới conversation
+        function createConversation() {
+            const title = prompt("Nhập tiêu đề cuộc trò chuyện:");
+            if (!title) return;
+
+            axios.post("http://localhost:8080/api/conversations", { title })
+                .then(res => {
+                    const { conversation } = res.data.data;
+                    loadConversations();
+                    selectConversation(conversation, null);
+                })
+                .catch(err => {
+                    console.error("❌ Lỗi tạo conversation:", err);
+                    alert("Không thể tạo cuộc trò chuyện mới!");
+                });
+        }
+
+        // Gửi tin nhắn
+        function sendMsg() {
+            const msgInput = document.getElementById("msg");
+            const text = msgInput.value.trim();
+            if (!text) return;
+            if (!conversationId) {
+                alert("Hãy chọn một cuộc trò chuyện trước!");
+                return;
+            }
+
+            addMessage(text, "user");
+            msgInput.value = "";
+
+            socket.emit("send_message", { conversationId, text });
+        }
+
+        // Khi click nút Figma
+        document.getElementById("figmaBtn").addEventListener("click", async () => {
+            if (!conversationId) {
+                alert("❌ Vui lòng chọn một cuộc trò chuyện trước!");
+                return;
+            }
+
+            try {
+                const res = await axios.post(`http://localhost:8080/api/conversations/${conversationId}/figma-layout`);
+                console.log("🎨 Figma layout response:", res.data);
+                alert("✅ Layout Figma đã được tạo thành công! Kiểm tra console để xem JSON layout.");
+            } catch (err) {
+                console.error("❌ Lỗi khi tạo layout Figma:", err);
+                alert("⚠️ Không thể tạo layout Figma!");
+            }
+        });
+
+        // Nhận tin nhắn AI từ server
+        socket.on("receive_message", (data) => {
+            console.log("📩 Tin nhắn từ server:", data.text);
+            addMessage(data.text, "system");
+        });
+
+        socket.on("error", (data) => {
+            console.log("❌ Lỗi từ server:", data.message);
+            alert(data.message);
+        });
+
+        // Khi tải trang
+        window.onload = loadConversations;
+    </script>
+</body>
+
+</html>

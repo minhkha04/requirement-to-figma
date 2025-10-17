@@ -1,0 +1,35 @@
+{
+  "dependencies": {
+    "@google/genai": "^1.25.0",
+    "bcrypt": "^6.0.0",
+    "cors": "^2.8.5",
+    "dotenv": "^17.2.2",
+    "express": "^5.1.0",
+    "express-rate-limit": "^8.1.0",
+    "fs-extra": "^11.3.2",
+    "handlebars": "^4.7.8",
+    "joi": "^18.0.1",
+    "joi-to-swagger": "^6.2.0",
+    "jsonwebtoken": "^9.0.2",
+    "mongoose": "^8.18.1",
+    "multer": "^2.0.2",
+    "nodemailer": "^7.0.6",
+    "path": "^0.12.7",
+    "socket.io": "^4.8.1",
+    "swagger-jsdoc": "^6.2.8",
+    "swagger-ui-express": "^5.0.1",
+    "ua-parser-js": "^2.0.5"
+  },
+  "name": "structure-expressjs",
+  "version": "1.0.0",
+  "description": "",
+  "main": "app.js",
+  "type": "module",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "dev": "node --watch src/app.js",
+    "start": "node src/app.js"
+  },
+  "author": "",
+  "license": "ISC"
+}

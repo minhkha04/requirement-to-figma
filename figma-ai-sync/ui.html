@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html>
+
+<body>
+    <h3>🟢 Listening for layout from backend...</h3>
+    <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+    <script>
+        const socket = io("http://localhost:8080");
+
+        socket.on("connect", () => {
+            console.log("✅ Connected to backend via Socket.IO");
+        });
+
+        socket.on("figma_layout", (payload) => {
+            console.log("📩 Received layout from backend", payload);
+            parent.postMessage({ pluginMessage: payload }, "*");
+        });
+    </script>
+</body>
+
+</html>
